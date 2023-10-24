@@ -1,0 +1,66 @@
+{
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": false
+  },
+  "package": {
+    "productName": "Awth Butler",
+    "version": "0.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "fs": {
+        "all": true,
+        "scope": ["$APP/*", "$RESOURCE/*", "resources/*"]
+      },
+      "path": {
+        "all": true
+      },
+      "protocol": {
+        "asset": true,
+        "assetScope": ["**"]
+      },
+      "shell": {
+        "all": false,
+        "open": true
+      }
+    },
+    "systemTray": {
+      "iconPath": "icons/awth_butler_hat.png",
+      "iconAsTemplate": true
+    },
+    "bundle": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
+      "active": true,
+      "targets": "all",
+      "identifier": "Awth-Butler",
+      "resources": [
+        "resources/*"
+      ],
+      "icon": [
+        "icons/128x128@2x.png",
+        "icons/icon.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ]
+    },
+    "security": {
+      "csp": "default-src 'self'; media-src 'self' asset: https://asset.localhost;"
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "",
+        "width": 800,
+        "height": 600
+      }
+    ]
+  }
+}
