@@ -42,12 +42,18 @@ fn main() {
     tauri::Builder::default()
         .system_tray(tray)
         .on_window_event(|event| match event.event() {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
-                event.window().hide().unwrap();
-                api.prevent_close();
-            }
-            _ => {}
-        })
+      tauri::WindowEvent::CloseRequested { api, .. } => {
+        #[cfg(not(target_os = "macos"))] {
+          event.window().hide().unwrap();
+        }
+
+        #[cfg(target_os = "macos")] {
+          tauri::AppHandle::hide(&event.window().app_handle()).unwrap();
+        }
+        api.prevent_close();
+      }
+      _ => {}
+    })
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
                 "open" => {
