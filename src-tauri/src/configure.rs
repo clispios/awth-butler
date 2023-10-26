@@ -16,6 +16,9 @@ use sysinfo::{Pid, PidExt, ProcessExt, System, SystemExt};
 use tauri::{AppHandle, Manager, State};
 use wait_timeout::ChildExt;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 #[derive(Clone, serde::Serialize)]
 struct Payload {
     event_type: String,
@@ -205,24 +208,51 @@ fn modify_file_se(prof: &Profile, creds_out: &RoleCreds) {
 
 pub fn update_creds(prof: &Profile) {
     if let Some(auth_token) = get_auth_token(&prof.sso_start_url) {
-        let cmd = Command::new("aws")
-            .args(&[
-                "sso",
-                "get-role-credentials",
-                "--output",
-                "json",
-                "--profile",
-                &prof.profile_name,
-                "--region",
-                prof.sso_region.as_ref().unwrap(),
-                "--role-name",
-                prof.sso_role_name.as_ref().unwrap(),
-                "--account-id",
-                prof.sso_account_id.as_ref().unwrap(),
-                "--access-token",
-                &auth_token,
-            ])
-            .output();
+        let cmd;
+        #[cfg(target_os = "windows")]
+        {
+            cmd = Command::new("aws")
+                .args(&[
+                    "sso",
+                    "get-role-credentials",
+                    "--output",
+                    "json",
+                    "--profile",
+                    &prof.profile_name,
+                    "--region",
+                    prof.sso_region.as_ref().unwrap(),
+                    "--role-name",
+                    prof.sso_role_name.as_ref().unwrap(),
+                    "--account-id",
+                    prof.sso_account_id.as_ref().unwrap(),
+                    "--access-token",
+                    &auth_token,
+                ])
+                .creation_flags(0x08000000) //hide windows console
+                .output();
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            cmd = Command::new("aws")
+                .args(&[
+                    "sso",
+                    "get-role-credentials",
+                    "--output",
+                    "json",
+                    "--profile",
+                    &prof.profile_name,
+                    "--region",
+                    prof.sso_region.as_ref().unwrap(),
+                    "--role-name",
+                    prof.sso_role_name.as_ref().unwrap(),
+                    "--account-id",
+                    prof.sso_account_id.as_ref().unwrap(),
+                    "--access-token",
+                    &auth_token,
+                ])
+                .output();
+        }
 
         match cmd {
             Ok(res) => {
@@ -250,11 +280,26 @@ pub fn sso_login(app: AppHandle, process_state: State<ProcessState>, prof: &str)
     let profile = prof.to_string();
     let re = Regex::new(r"[A-Z]{4}-[A-Z]{4}").unwrap();
     let re_url = Regex::new(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)").unwrap();
-    let mut child = Command::new("aws")
-        .args(&["sso", "login", "--profile", &profile, "--no-browser"])
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    let mut child;
+
+    #[cfg(target_os = "windows")]
+    {
+        child = Command::new("aws")
+            .args(&["sso", "login", "--profile", &profile, "--no-browser"])
+            .creation_flags(0x08000000) //hide windows console
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        child = Command::new("aws")
+            .args(&["sso", "login", "--profile", &profile, "--no-browser"])
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+    }
 
     let command_timeout = Duration::from_secs(60);
     let out = child.stdout.as_mut().unwrap();
