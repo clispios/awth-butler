@@ -23,6 +23,7 @@
     "flowbite-svelte-icons": "^0.4.4",
     "postcss": "^8.4.24",
     "postcss-load-config": "^4.0.1",
+    "compare-versions": "6.1.0",
     "svelte": "^4.0.5",
     "svelte-check": "^3.4.6",
     "svelte-preprocess": "^5.0.0",

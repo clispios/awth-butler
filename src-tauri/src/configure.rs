@@ -49,6 +49,7 @@ struct ProfileCreds {
 pub struct ProcessState {
     pub running: Mutex<bool>,
     pub pid: Mutex<u32>,
+    pub cli_ver: Mutex<String>,
 }
 
 #[derive(Deserialize, Debug)]

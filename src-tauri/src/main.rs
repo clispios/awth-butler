@@ -1,12 +1,58 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod configure;
-use std::sync::Mutex;
+use regex::Regex;
+use std::{process::Command, sync::Mutex};
 use sysinfo::{Pid, PidExt, ProcessExt, System, SystemExt};
 use tauri::{
     AppHandle, CustomMenuItem, Manager, State, SystemTray, SystemTrayEvent, SystemTrayMenu,
     SystemTrayMenuItem,
 };
+
+fn init_aws_version() -> Option<String> {
+    let re = Regex::new(r"aws-cli/(\d+)\.(\d+)\.(\d+)").unwrap();
+    let cmd;
+    #[cfg(target_os = "windows")]
+    {
+        cmd = Command::new("aws")
+            .arg("--version")
+            .creation_flags(0x08000000) //hide windows console
+            .output();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        cmd = Command::new("aws").arg("--version").output();
+    }
+
+    match cmd {
+        Ok(res) => {
+            if let Ok(out) = String::from_utf8(res.stdout) {
+                if let Some(vzn) = re.find(&out) {
+                    return Some(
+                        vzn.as_str()
+                            .to_string()
+                            .split("/")
+                            .last()
+                            .unwrap_or("0.0.0")
+                            .to_string(),
+                    );
+                }
+            }
+            return None;
+        }
+        Err(e) => {
+            println!("error AWS version check... {}", e);
+            None
+        }
+    }
+}
+
+#[tauri::command]
+fn get_aws_cli_ver(process_state: State<configure::ProcessState>) -> String {
+    let ver = process_state.cli_ver.lock().unwrap();
+    return ver.clone();
+}
 
 #[tauri::command]
 fn get_full_profiles() -> Vec<configure::Profile> {
@@ -34,7 +80,6 @@ fn do_sso_cancel(process_state: State<configure::ProcessState>, running_login_pi
 }
 
 fn main() {
-
     let _ = fix_path_env::fix();
     let open = CustomMenuItem::new("open".to_string(), "Open");
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
@@ -47,18 +92,20 @@ fn main() {
     tauri::Builder::default()
         .system_tray(tray)
         .on_window_event(|event| match event.event() {
-      tauri::WindowEvent::CloseRequested { api, .. } => {
-        #[cfg(not(target_os = "macos"))] {
-          event.window().hide().unwrap();
-        }
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                #[cfg(not(target_os = "macos"))]
+                {
+                    event.window().hide().unwrap();
+                }
 
-        #[cfg(target_os = "macos")] {
-          tauri::AppHandle::hide(&event.window().app_handle()).unwrap();
-        }
-        api.prevent_close();
-      }
-      _ => {}
-    })
+                #[cfg(target_os = "macos")]
+                {
+                    tauri::AppHandle::hide(&event.window().app_handle()).unwrap();
+                }
+                api.prevent_close();
+            }
+            _ => {}
+        })
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
                 "open" => {
@@ -95,10 +142,12 @@ fn main() {
             _ => {}
         })
         .manage(configure::ProcessState {
+            cli_ver: Mutex::from("0.0.0".to_string()),
             running: Mutex::from(false),
             pid: Mutex::from(0),
         })
         .invoke_handler(tauri::generate_handler![
+            get_aws_cli_ver,
             do_sso_login,
             do_sso_cancel,
             update_creds,
@@ -106,6 +155,12 @@ fn main() {
             get_full_profiles
         ])
         .setup(|app| {
+            let ver = init_aws_version();
+            if let Some(v) = ver {
+                let app_state: State<configure::ProcessState> = app.state();
+                let mut cli_ver = app_state.cli_ver.lock().unwrap();
+                *cli_ver = v;
+            }
             let window = app.get_window("main").unwrap();
             window.center().unwrap();
             Ok(())
