@@ -13,16 +13,8 @@
   "tauri": {
     "allowlist": {
       "all": false,
-      "fs": {
-        "all": true,
-        "scope": ["$APP/*", "$RESOURCE/*", "resources/*"]
-      },
       "path": {
         "all": true
-      },
-      "protocol": {
-        "asset": true,
-        "assetScope": ["**"]
       },
       "shell": {
         "all": false,
@@ -34,15 +26,9 @@
       "iconAsTemplate": true
     },
     "bundle": {
-      "appimage": {
-        "bundleMediaFramework": true
-      },
       "active": true,
       "targets": "all",
       "identifier": "Awth-Butler",
-      "resources": [
-        "resources/*"
-      ],
       "icon": [
         "icons/128x128@2x.png",
         "icons/icon.png",
@@ -51,15 +37,17 @@
       ]
     },
     "security": {
-      "csp": "default-src 'self'; media-src 'self' asset: https://asset.localhost;"
+      "csp": null
     },
     "windows": [
       {
         "fullscreen": false,
         "resizable": true,
         "title": "",
-        "width": 800,
-        "height": 600
+        "width": 540,
+        "height": 550,
+        "minWidth": 540,
+        "minHeight": 550
       }
     ]
   }

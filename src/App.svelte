@@ -10,7 +10,7 @@
             <img src="/icon.png" class="mr-3 h-20 sm:h-15" alt="Svelte Logo" />
             <span
                 class="self-center whitespace-nowrap text-3xl font-semibold dark:text-white"
-                >AWth Butler</span
+                >Awth Butler</span
             >
         </div>
         <div class="right-align">

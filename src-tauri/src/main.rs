@@ -9,8 +9,13 @@ use tauri::{
 };
 
 #[tauri::command]
-fn get_profiles() -> Vec<String> {
-    return configure::get_profile_names();
+fn get_full_profiles() -> Vec<configure::Profile> {
+    return configure::get_profiles();
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn update_creds(full_prof: configure::Profile) {
+    configure::update_creds(&full_prof);
 }
 
 #[tauri::command]
@@ -96,8 +101,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             do_sso_login,
             do_sso_cancel,
-            get_profiles,
-            get_profile_exp
+            update_creds,
+            get_profile_exp,
+            get_full_profiles
         ])
         .setup(|app| {
             let window = app.get_window("main").unwrap();

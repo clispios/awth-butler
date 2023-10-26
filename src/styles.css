@@ -43,6 +43,13 @@
   justify-content: center;
 }
 
+.center {
+  text-align: center;
+  display: flex;
+  flex-flow: column;
+  justify-content: center;
+}
+
 /* a { */
 /*   font-weight: 500; */
 /*   color: #646cff; */
