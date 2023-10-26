@@ -3,6 +3,7 @@ use dirs;
 use ini::Ini;
 use regex::Regex;
 use serde::Deserialize;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{stdout, BufReader};
 use std::io::{Read, Write};
@@ -23,7 +24,7 @@ struct Payload {
     process_pid: u32,
 }
 
-#[derive(Default, Deserialize, Debug, serde::Serialize)]
+#[derive(Deserialize, Debug, serde::Serialize)]
 pub struct Profile {
     profile_name: String,
     sso_start_url: Option<String>,
@@ -33,7 +34,7 @@ pub struct Profile {
     region: Option<String>,
 }
 
-#[derive(Default, Deserialize, Debug, serde::Serialize)]
+#[derive(Deserialize, Debug, serde::Serialize)]
 struct ProfileCreds {
     aws_access_key_id: Option<String>,
     aws_secret_access_key: Option<String>,
@@ -47,7 +48,6 @@ pub struct ProcessState {
     pub pid: Mutex<u32>,
 }
 
-#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct RoleCreds {
@@ -57,33 +57,32 @@ struct RoleCreds {
     expiration: i64,
 }
 
-#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct CredsOutput {
     role_credentials: RoleCreds,
 }
 
-#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct CacheEntry {
     start_url: String,
-    region: String,
     access_token: String,
-    expires_at: String,
-    client_id: String,
-    client_secret: String,
-    registration_expires_at: String,
+}
+
+fn gimmie_homedir() -> Option<OsString> {
+    match dirs::home_dir() {
+        Some(hd_pb) => Some(hd_pb.into_os_string()),
+        None => {
+            println!("No homedir???");
+            None
+        }
+    }
 }
 
 pub fn get_profile_status(prof: &str) -> String {
-    let homedir = dirs::home_dir()
-        .unwrap()
-        .into_os_string()
-        .into_string()
-        .unwrap();
-    let filepath = homedir + "/.aws/credentials";
+    let mut filepath: OsString = gimmie_homedir().unwrap();
+    filepath.push("/.aws/credentials");
     if let (Ok(_exists), Ok(conf)) = (
         Path::new(&filepath).try_exists(),
         Ini::load_from_file(&filepath),
@@ -105,13 +104,8 @@ pub fn get_profile_status(prof: &str) -> String {
 }
 
 pub fn get_profiles() -> Vec<Profile> {
-    let homedir = dirs::home_dir()
-        .unwrap()
-        .into_os_string()
-        .into_string()
-        .unwrap();
-    let filepath = homedir.to_owned() + "/.aws/config";
-
+    let mut filepath: OsString = gimmie_homedir().unwrap();
+    filepath.push("/.aws/config");
     if let (Ok(_exists), Ok(conf)) = (
         Path::new(&filepath).try_exists(),
         Ini::load_from_file(&filepath),
@@ -156,14 +150,9 @@ pub fn kill_running_login(process_state: State<ProcessState>, id: u32) {
     *process_pid = 0;
 }
 
-fn get_auth_token(sso_url: &Option<String>) -> String {
-    let homedir = dirs::home_dir()
-        .unwrap()
-        .into_os_string()
-        .into_string()
-        .unwrap();
-    let folder_path = homedir.to_owned() + "/.aws/sso/cache/";
-    let mut auth_token: String = "".into();
+fn get_auth_token(sso_url: &Option<String>) -> Option<String> {
+    let mut folder_path: OsString = gimmie_homedir().unwrap();
+    folder_path.push("/.aws/sso/cache/");
     if let (Ok(files), Some(url)) = (std::fs::read_dir(folder_path), sso_url) {
         for file in files {
             let file = File::open(Path::new(file.unwrap().path().as_path())).unwrap();
@@ -172,21 +161,17 @@ fn get_auth_token(sso_url: &Option<String>) -> String {
             let entry: Result<CacheEntry, serde_json::Error> = serde_json::from_reader(reader);
             if let Ok(sso_file) = entry {
                 if url == &sso_file.start_url {
-                    auth_token = sso_file.access_token;
+                    return Some(sso_file.access_token);
                 }
             }
         }
     }
-    return auth_token;
+    return None;
 }
 
 fn modify_file_se(prof: &Profile, creds_out: &RoleCreds) {
-    let homedir = dirs::home_dir()
-        .unwrap()
-        .into_os_string()
-        .into_string()
-        .unwrap();
-    let filepath = homedir + "/.aws/credentials";
+    let mut filepath: OsString = gimmie_homedir().unwrap();
+    filepath.push("/.aws/credentials");
     if let (Ok(_exists), Ok(mut conf)) = (
         Path::new(&filepath).try_exists(),
         Ini::load_from_file(&filepath),
@@ -212,42 +197,45 @@ fn modify_file_se(prof: &Profile, creds_out: &RoleCreds) {
 }
 
 pub fn update_creds(prof: &Profile) {
-    let auth_token = get_auth_token(&prof.sso_start_url);
-    let cmd = Command::new("aws")
-        .args(&[
-            "sso",
-            "get-role-credentials",
-            "--output",
-            "json",
-            "--profile",
-            &prof.profile_name,
-            "--region",
-            prof.sso_region.as_ref().unwrap(),
-            "--role-name",
-            prof.sso_role_name.as_ref().unwrap(),
-            "--account-id",
-            prof.sso_account_id.as_ref().unwrap(),
-            "--access-token",
-            &auth_token,
-        ])
-        .output();
+    if let Some(auth_token) = get_auth_token(&prof.sso_start_url) {
+        let cmd = Command::new("aws")
+            .args(&[
+                "sso",
+                "get-role-credentials",
+                "--output",
+                "json",
+                "--profile",
+                &prof.profile_name,
+                "--region",
+                prof.sso_region.as_ref().unwrap(),
+                "--role-name",
+                prof.sso_role_name.as_ref().unwrap(),
+                "--account-id",
+                prof.sso_account_id.as_ref().unwrap(),
+                "--access-token",
+                &auth_token,
+            ])
+            .output();
 
-    match cmd {
-        Ok(res) => {
-            let creds_res: Result<CredsOutput, serde_json::Error> =
-                serde_json::from_slice(&res.stdout);
-            match creds_res {
-                Ok(json) => {
-                    modify_file_se(prof, &json.role_credentials);
-                }
-                Err(e) => {
-                    println!("{}", e);
+        match cmd {
+            Ok(res) => {
+                let creds_res: Result<CredsOutput, serde_json::Error> =
+                    serde_json::from_slice(&res.stdout);
+                match creds_res {
+                    Ok(json) => {
+                        modify_file_se(prof, &json.role_credentials);
+                    }
+                    Err(e) => {
+                        println!("{}", e);
+                    }
                 }
             }
+            Err(e) => {
+                println!("error during creds update... {}", e);
+            }
         }
-        Err(_) => {
-            println!("error during creds update...");
-        }
+    } else {
+        println!("Could not find valid authentication token!");
     }
 }
 
