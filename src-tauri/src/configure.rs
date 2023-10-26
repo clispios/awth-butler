@@ -172,10 +172,17 @@ fn get_auth_token(sso_url: &Option<String>) -> Option<String> {
 fn modify_file_se(prof: &Profile, creds_out: &RoleCreds) {
     let mut filepath: OsString = gimmie_homedir().unwrap();
     filepath.push("/.aws/credentials");
-    if let (Ok(_exists), Ok(mut conf)) = (
-        Path::new(&filepath).try_exists(),
-        Ini::load_from_file(&filepath),
-    ) {
+    let ini = match Path::new(&filepath).try_exists() {
+        Ok(exists) => {
+            if exists {
+                Ini::load_from_file(&filepath)
+            } else {
+                Ok(Ini::new())
+            }
+        }
+        Err(_) => Ok(Ini::new()),
+    };
+    if let Ok(mut conf) = ini {
         let dt: DateTime<Utc> = DateTime::<Utc>::from_timestamp(creds_out.expiration / 1000, 0)
             .expect("invalid timestamp");
         let formatted = format!("{}", dt.format("%Y-%m-%dT%H:%M:%S+0000"));
