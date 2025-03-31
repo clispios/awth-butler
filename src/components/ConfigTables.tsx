@@ -31,7 +31,7 @@ export function LegacyProfileTable(
                 <tr
                   class={`hover:bg-base-300 hover:text-base-content cursor-pointer ${
                     isSelectedFn(prof.profile_name, "legacies")
-                      ? "bg-accent text-accent-content font-semibold"
+                      ? "bg-secondary text-secondary-content font-semibold"
                       : ""
                   }`}
                   onClick={() => onClickFn(prof)}
@@ -78,12 +78,16 @@ export function SsoSessionTable(
             </tr>
           </thead>
           <tbody>
-            <For each={sessions}>
+            <For
+              each={sessions?.sort((a, b) =>
+                a.session_name.localeCompare(b.session_name)
+              )}
+            >
               {(sess) => (
                 <tr
                   class={`hover:bg-base-300 hover:text-base-content cursor-pointer ${
                     isSelectedFn(sess.session_name, "sessions")
-                      ? "bg-accent text-accent-content font-semibold"
+                      ? "bg-secondary text-secondary-content font-semibold"
                       : ""
                   }`}
                   onClick={() => onClickFn(sess)}
@@ -126,12 +130,16 @@ export function SsoProfileTable(
             </tr>
           </thead>
           <tbody>
-            <For each={profiles}>
+            <For
+              each={profiles?.sort((a, b) =>
+                a.profile_name.localeCompare(b.profile_name)
+              )}
+            >
               {(prof) => (
                 <tr
                   class={`hover:bg-base-300 hover:text-base-content cursor-pointer ${
                     isSelectedFn(prof.profile_name, "ssos")
-                      ? "bg-accent text-accent-content font-semibold"
+                      ? "bg-secondary text-secondary-content font-semibold"
                       : ""
                   }`}
                   onClick={() => onClickFn(prof)}
