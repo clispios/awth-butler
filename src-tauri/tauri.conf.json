@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "awth-butler",
+  "version": "0.1.0",
+  "identifier": "com.shure.awth-butler.app",
+  "build": {
+    "beforeDevCommand": "deno task dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "deno task build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "",
+        "label": "main",
+        "width": 700,
+        "minWidth": 700,
+        "height": 720,
+        "minHeight": 720,
+        "visible": false
+      },
+      {
+        "title": "",
+        "label": "splashscreen",
+        "url": "/splashscreen",
+        "width": 700,
+        "minWidth": 700,
+        "height": 720,
+        "minHeight": 720
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

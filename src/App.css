@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@plugin "daisyui" {
+  themes: pastel --default, night --prefersdark;
+}
+
+/* cursor set to not-allowed when btn is disabled and hovering */
+.btn:disabled {
+  cursor: not-allowed;
+}
