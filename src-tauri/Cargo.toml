@@ -38,7 +38,7 @@ serde_json = "1.0.140"
 sha1 = "0.10.6"
 walkdir = "2.5.0"
 webbrowser = { version = "1.0.4", features = ["hardened"] }
-tauri-plugin-dialog = { version = "2", registry = "cargo" }
+tauri-plugin-dialog = { version = "2" }
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
