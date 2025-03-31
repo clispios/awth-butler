@@ -17,6 +17,11 @@ pub(crate) fn get_credentials_for_profile(
     let home_dir = dirs::home_dir().ok_or(anyhow!("No home directory detected!"))?;
     let credentials_path = home_dir.join(".aws").join("credentials");
 
+    // Ensure file exists, if not return None
+    if !credentials_path.exists() {
+        return Ok(None);
+    }
+
     // Parse the existing credentials file
     let ini = ini::Ini::load_from_file(&credentials_path)?;
 

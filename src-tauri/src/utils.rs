@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use chrono::{DateTime, Utc, format::ParseErrorKind};
+use chrono::{DateTime, Utc};
 
 pub(crate) async fn fetch_profiles()
 -> Result<aws_runtime::env_config::section::EnvConfigSections, anyhow::Error> {

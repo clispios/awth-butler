@@ -154,7 +154,7 @@ async fn inner_sso_session_login(
 ) -> Result<(), anyhow::Error> {
     // grab session information from config, if it exists
     let profile_set = &state.lock().await.aws_profiles;
-    println!("{:#?}", profile_set);
+    // println!("{:#?}", profile_set);
     let session = profile_set
         .sso_session(session_name)
         .ok_or(anyhow!("Session not found!"))?;
@@ -225,7 +225,7 @@ async fn inner_sso_session_login(
         store_credentials_for_profile(prof_name, &creds)?;
     }
 
-    println!("finished doing auth thing!");
+    // println!("finished doing auth thing!");
     Ok(())
 }
 
@@ -274,7 +274,7 @@ async fn inner_legacy_profile_login(
 pub(crate) async fn refresh_profiles(state: State<'_, Mutex<ButlerState>>) -> Result<(), String> {
     let mut state = state.lock().await;
     state.aws_profiles = fetch_profiles().await.map_err(|e| e.to_string())?;
-    println!("{:#?}", state.aws_profiles);
+    // println!("{:#?}", state.aws_profiles);
     Ok(())
 }
 
@@ -312,6 +312,14 @@ pub(crate) struct ButlerSsoSession {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct ButlerSsoProfile {
     profile_name: String,
+    session_name: String,
+    profile_expiration: Option<chrono::DateTime<chrono::Utc>>,
+    fresh: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct ButlerSsoLegacyProfile {
+    profile_name: String,
     profile_expiration: Option<chrono::DateTime<chrono::Utc>>,
     fresh: bool,
 }
@@ -320,14 +328,14 @@ pub(crate) struct ButlerSsoProfile {
 pub(crate) struct ButlerSsoConfig {
     sessions: Vec<ButlerSsoSession>,
     sso_profiles: Vec<ButlerSsoProfile>,
-    legacy_profiles: Vec<ButlerSsoProfile>,
+    legacy_profiles: Vec<ButlerSsoLegacyProfile>,
 }
 
 #[tauri::command]
 pub(crate) async fn fetch_butler_config(
     state: State<'_, Mutex<ButlerState>>,
 ) -> Result<ButlerSsoConfig, String> {
-    println!("Fetching butler config...");
+    // println!("Fetching butler config...");
     let state = &state.lock().await.aws_profiles;
     let sessions = state.sso_sessions();
     let profiles = state
@@ -349,7 +357,7 @@ pub(crate) async fn fetch_butler_config(
         })
         .collect::<Vec<_>>();
 
-    println!("fetched sessions, session profiles and legacy profiles... Now making config");
+    // println!("fetched sessions, session profiles and legacy profiles... Now making config");
     let config = ButlerSsoConfig {
         sessions: sessions
             .map(|sn| {
@@ -374,11 +382,15 @@ pub(crate) async fn fetch_butler_config(
             .map(|prof| {
                 let cached_creds = get_credentials_for_profile(prof.name())?;
                 let prof_exp = cached_creds.map(|creds| creds.expiration);
+                let sess_name = prof
+                    .get("sso_session")
+                    .ok_or(anyhow!("No session name found!"))?;
                 let prof_fresh = prof_exp
                     .map(|exp| exp > chrono::Utc::now())
                     .unwrap_or(false);
                 Ok::<_, anyhow::Error>(ButlerSsoProfile {
                     profile_name: prof.name().to_string(),
+                    session_name: sess_name.to_string(),
                     profile_expiration: prof_exp,
                     fresh: prof_fresh,
                 })
@@ -393,7 +405,7 @@ pub(crate) async fn fetch_butler_config(
                 let prof_fresh = prof_exp
                     .map(|exp| exp > chrono::Utc::now())
                     .unwrap_or(false);
-                Ok::<_, anyhow::Error>(ButlerSsoProfile {
+                Ok::<_, anyhow::Error>(ButlerSsoLegacyProfile {
                     profile_name: prof.name().to_string(),
                     profile_expiration: prof_exp,
                     fresh: prof_fresh,
@@ -402,6 +414,6 @@ pub(crate) async fn fetch_butler_config(
             .collect::<Result<Vec<_>, anyhow::Error>>()
             .map_err(|e| e.to_string())?,
     };
-    println!("{:#?}", config);
+    // println!("{:#?}", config);
     Ok(config)
 }

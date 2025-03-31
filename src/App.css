@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-  themes: pastel --default, night --prefersdark;
+  themes: nord --default, dracula --prefersdark;
 }
 
-/* cursor set to not-allowed when btn is disabled and hovering */
-.btn:disabled {
-  cursor: not-allowed;
+@plugin "daisyui/theme" {
+  name: "dracula";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --radius-selector: 1rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
 }

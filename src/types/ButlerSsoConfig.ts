@@ -7,6 +7,13 @@ export type ButlerSsoSession = {
 
 export type ButerSsoProfile = {
   profile_name: string;
+  session_name: string;
+  profile_expiration: string | null;
+  fresh: boolean;
+};
+
+export type ButlerSsoLegacyProfile = {
+  profile_name: string;
   profile_expiration: string | null;
   fresh: boolean;
 };
@@ -14,5 +21,5 @@ export type ButerSsoProfile = {
 export type ButlerSsoConfig = {
   sessions: ButlerSsoSession[];
   sso_profiles: ButerSsoProfile[];
-  legacy_profiles: ButerSsoProfile[];
+  legacy_profiles: ButlerSsoLegacyProfile[];
 };

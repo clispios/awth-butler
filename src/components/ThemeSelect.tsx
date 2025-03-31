@@ -1,7 +1,7 @@
 function ThemeSelect(extraClasses = "") {
   return (
     <label class={"swap swap-rotate" + " " + extraClasses}>
-      <input type="checkbox" class="theme-controller" value="pastel" />
+      <input type="checkbox" class="theme-controller" value="nord" />
 
       <svg
         class="swap-off h-6 w-6 fill-current"

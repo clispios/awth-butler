@@ -1,4 +1,4 @@
-import { createSignal, For } from "solid-js";
+import { createSignal } from "solid-js";
 import butlogo from "./../app-icon.png";
 import ThemeSelect from "./components/ThemeSelect";
 import { invoke } from "@tauri-apps/api/core";
@@ -8,18 +8,19 @@ import "./App.css";
 import {
   ButerSsoProfile,
   ButlerSsoConfig,
+  ButlerSsoLegacyProfile,
   ButlerSsoSession,
 } from "./types/ButlerSsoConfig";
-import FreshBadge from "./components/FreshBadge";
-import StaleBadge from "./components/StaleBadge";
-import displayDate from "./utils/DisplayDate";
-
-// @ts-ignore TS6133
-import clickOutside from "./utils/ClickOutside";
+import {
+  LegacyProfileTable,
+  SsoProfileTable,
+  SsoSessionTable,
+} from "./components/ConfigTables";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 type SelectedRowData = {
   name: string;
-  table: "sessions" | "legacies";
+  table: "sessions" | "ssos" | "legacies";
 };
 
 function App() {
@@ -43,12 +44,16 @@ function App() {
     await fetch_config();
   }
 
+  async function refresh_profiles_no_deselect() {
+    await invoke("refresh_profiles", {});
+    await fetch_config();
+  }
+
   async function authenticate_aws() {
     await invoke("authenticate_aws", {
       loginType: loginType(),
       name: name(),
     });
-    await refresh_profiles();
   }
 
   const resetSelection = () => {
@@ -64,31 +69,30 @@ function App() {
   };
 
   // Function to handle row selection in table 2
-  const handleLegacyProfileSelection = (item: ButerSsoProfile) => {
+  const handleLegacyProfileSelection = (item: ButlerSsoLegacyProfile) => {
     setSelectedRow({ name: item.profile_name, table: "legacies" });
     setName(item.profile_name);
     setLoginType("LegacyProfile");
   };
 
-  // Check if a row is selected
-  const isSelected = (id: string, table: "sessions" | "legacies") => {
-    const current = selectedRow();
-    return current && current.name === id && current.table === table;
+  const handleSsoProfileSelection = (item: ButerSsoProfile) => {
+    setSelectedRow({ name: item.profile_name, table: "ssos" });
+    setName(item.profile_name);
+    setLoginType("LegacyProfile");
   };
 
-  function listToUnorderedList(list: string[]) {
-    return (
-      <ul>
-        <For each={list.sort()}>
-          {(item) => <li>{item}</li>}
-        </For>
-      </ul>
-    );
-  }
+  // Check if a row is selected
+  const isSelected = (
+    id: string,
+    table: "sessions" | "legacies" | "ssos",
+  ): boolean => {
+    const current = selectedRow();
+    return current !== null && current.name === id && current.table === table;
+  };
 
   window.addEventListener("DOMContentLoaded", () => {
     console.log("DOM fully loaded and parsed. Fetching config...");
-    fetch_config()
+    refresh_profiles()
       .then(() => {
         console.log("Config fetched successfully.");
       })
@@ -97,6 +101,30 @@ function App() {
         message("Error fetching config: " + error.message);
       });
   });
+
+  const appWebview = getCurrentWebviewWindow();
+  appWebview.listen<string>("configs-change", (_) => {
+    console.log("Configs changed. Fetching config...");
+    refresh_profiles_no_deselect()
+      .then(() => {
+        console.log("Config fetched successfully.");
+      })
+      .catch((error) => {
+        console.error("Error fetching config:", error);
+        message("Error fetching config: " + error.message);
+      });
+  });
+
+  const authBtnText = (): string => {
+    if (loginType()) {
+      if (loginType() === "SsoSession") {
+        return "Authenticate Session: " + name();
+      } else if (loginType() === "LegacyProfile") {
+        return "Authenticate Profile: " + name();
+      }
+    }
+    return "Select an identity to authenticate";
+  };
 
   return (
     <main>
@@ -107,98 +135,52 @@ function App() {
             class="h-20 pr-3"
             alt="logo"
           />
+
           <h1 class="text-3xl font-semibold">
             Awth Butler
           </h1>
+
           {ThemeSelect("float-right ml-auto pr-2 align-middle")}
         </div>
-        <div class="w-2xl mx-auto">
-          <div class="sticky flex justify-between items-center p-4">
-            <button class="btn btn-accent w-40 ml-4" onClick={refresh_profiles}>
+
+        <div class="w-3xl mx-auto">
+          <div class="sticky flex justify-end items-center pt-4">
+            {
+              /* <button
+              class="btn btn-secondary text-secondary-content w-40 ml-4"
+              onClick={refresh_profiles}
+            >
               Refresh Config
-            </button>
+            </button> */
+            }
+
             <button
               class="btn bg-gradient-to-br from-primary to-secondary text-primary-content disabled:opacity-40 min-w-40 mr-4"
               onClick={authenticate_aws}
               disabled={!selectedRow()}
             >
-              Authenticate {loginType()
-                ? loginType() === "SsoSession" ? "Session:" : "Profile:"
-                : ""} {name()}
+              {authBtnText()}
             </button>
           </div>
-          <div class="flex flex-col p-4 gap-6">
-            {/* First Table */}
-            <div class="w-full overflow-x-auto">
-              <h3 class="font-bold mb-2">Sessions</h3>
-              <div class="overflow-x-auto rounded-box border border-base-content/10">
-                <table class="table w-full">
-                  <thead class="bg-base-200">
-                    <tr>
-                      <th>Name</th>
-                      <th>Associated Profiles</th>
-                      <th>Status</th>
-                      <th>Expiration</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={butlerConfig()?.sessions}>
-                      {(sess) => (
-                        <tr
-                          class={`hover:bg-base-300 hover:text-base-content cursor-pointer ${
-                            isSelected(sess.session_name, "sessions")
-                              ? "bg-info text-info-content"
-                              : ""
-                          }`}
-                          onClick={() => handleSessionSelection(sess)}
-                        >
-                          <td>{sess.session_name}</td>
-                          <td>
-                            {listToUnorderedList(sess.profile_names)}
-                          </td>
-                          <td>{sess.fresh ? FreshBadge() : StaleBadge()}</td>
-                          <td>{displayDate(sess.session_expiration)}</td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
-            </div>
 
-            {/* Second Table */}
-            <div class="w-full overflow-x-auto">
-              <h3 class="font-bold mb-2">Legacy Profiles</h3>
-              <div class="overflow-x-auto rounded-box border border-base-content/10">
-                <table class="table w-full">
-                  <thead class="bg-base-200">
-                    <tr>
-                      <th>Name</th>
-                      <th>Status</th>
-                      <th>Expiration</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={butlerConfig()?.legacy_profiles}>
-                      {(prof) => (
-                        <tr
-                          class={`hover:bg-base-300 hover:text-base-content cursor-pointer ${
-                            isSelected(prof.profile_name, "legacies")
-                              ? "bg-info text-info-content"
-                              : ""
-                          }`}
-                          onClick={() => handleLegacyProfileSelection(prof)}
-                        >
-                          <td>{prof.profile_name}</td>
-                          <td>{prof.fresh ? FreshBadge() : StaleBadge()}</td>
-                          <td>{displayDate(prof.profile_expiration)}</td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div class="flex flex-col p-4 gap-6">
+            {SsoSessionTable(
+              butlerConfig()?.sessions,
+              isSelected,
+              handleSessionSelection,
+            )}
+
+            {SsoProfileTable(
+              butlerConfig()?.sso_profiles,
+              isSelected,
+              handleSsoProfileSelection,
+            )}
+
+            {LegacyProfileTable(
+              butlerConfig()?.legacy_profiles,
+              isSelected,
+              handleLegacyProfileSelection,
+            )}
           </div>
         </div>
       </div>

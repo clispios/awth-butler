@@ -72,6 +72,10 @@ pub(crate) fn get_token_from_cache(session_name: &str) -> Result<Option<SsoToken
         .join("sso")
         .join("cache");
 
+    // Ensure the directory exists
+    if !cache_dir.exists() {
+        return Ok(None);
+    }
     // Look through all files in the directory
     for entry in WalkDir::new(&cache_dir)
         .max_depth(1)
