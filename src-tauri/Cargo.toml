@@ -1,5 +1,5 @@
 [package]
-name = "shure-awth-butler"
+name = "awth-butler"
 version = "0.1.1"
 description = "A desktop app for helping with AWS SSO login"
 authors = ["George Nelson"]

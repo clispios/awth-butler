@@ -43,7 +43,7 @@ async fn create_registered_client(
 ) -> Result<RegisterClientOutput, anyhow::Error> {
     Ok(sso_oidc_client
         .register_client()
-        .client_name("shure-aws-awth-butler")
+        .client_name("aws-awth-butler")
         .client_type("public")
         .scopes("sso:account:access")
         .send()
