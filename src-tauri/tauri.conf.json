@@ -36,9 +36,6 @@
   },
   "bundle": {
     "active": true,
-    "macOS": {
-      "signingIdentity": "5E2C9C890EE1FFA071B5BA0301336470A2A5D30D"
-    },
     "targets": "all",
     "icon": [
       "icons/32x32.png",

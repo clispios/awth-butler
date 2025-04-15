@@ -37,7 +37,6 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-          cache: "deno" # Set this to npm, yarn or pnpm.
 
       - name: Cache Deno Dependencies
         uses: actions/cache@v3
