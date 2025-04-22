@@ -6,7 +6,34 @@ pub(crate) async fn fetch_profiles()
     let fs = aws_types::os_shim_internal::Fs::real();
     let env = aws_types::os_shim_internal::Env::real();
     let profile_files = aws_runtime::env_config::file::EnvConfigFiles::default();
-    Ok(aws_config::profile::load(&fs, &env, &profile_files, None).await?)
+    let conf = aws_config::profile::load(&fs, &env, &profile_files, None).await;
+    match conf {
+        Ok(profiles) => Ok(profiles),
+        Err(e) => {
+            if let Some(home) = dirs::home_dir() {
+                let aws_folder = home.join(".aws");
+                if aws_folder.exists() {
+                    let config_file = aws_folder.join("config");
+                    if config_file.exists() {
+                        let config_file_str = std::fs::read_to_string(config_file);
+                        if let Err(e) = config_file_str {
+                            return Err(anyhow!(
+                                "Failed to read AWS config file: {}",
+                                e.to_string()
+                            ));
+                        }
+                    } else {
+                        return Err(anyhow!("AWS config file does not exist"));
+                    }
+                } else {
+                    return Err(anyhow!("AWS folder does not exist in home directory"));
+                }
+            } else {
+                return Err(anyhow!("Failed to get home directory"));
+            };
+            Err(anyhow!("Failed to load AWS profiles: {}", e.to_string()))
+        }
+    }
 }
 
 pub(crate) fn parse_aws_date_robust(date_str: &str) -> Result<DateTime<Utc>, anyhow::Error> {
