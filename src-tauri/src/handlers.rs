@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use aws_config::{Region, profile::Profile};
+use aws_config::Region;
 use aws_sdk_sso::operation::get_role_credentials::GetRoleCredentialsOutput;
 use aws_sdk_ssooidc::operation::{
     register_client::RegisterClientOutput,
@@ -19,9 +19,12 @@ use tokio::sync::{
 
 use crate::{
     ButlerState,
+    aws::{
+        config::Profile,
+        credentials::{get_credentials_for_profile, store_credentials_for_profile},
+    },
     cache::{get_token_from_cache, store_token_in_cache},
-    credentials::{get_credentials_for_profile, store_credentials_for_profile},
-    fetch_profiles,
+    fetch_profiles_new,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -156,7 +159,8 @@ async fn inner_sso_session_login(
     let profile_set = &state.lock().await.aws_profiles;
     // println!("{:#?}", profile_set);
     let session = profile_set
-        .sso_session(session_name)
+        .sessions
+        .get(session_name)
         .ok_or(anyhow!("Session not found!"))?;
     let sso_region = session
         .get("sso_region")
@@ -186,9 +190,10 @@ async fn inner_sso_session_login(
 
     // find all profiles that use this session
     let sso_client = aws_sdk_sso::Client::new(&config);
-    let profiles = profile_set.profiles();
+    let profiles = &profile_set.profiles;
     let profiles_using_session: Vec<&Profile> = profiles
-        .flat_map(|prof_name| profile_set.get_profile(prof_name))
+        .iter()
+        .flat_map(|prof_name| profile_set.profiles.get(prof_name.0))
         .filter(|prof| prof.get("sso_session") == Some(session_name))
         .collect();
 
@@ -236,7 +241,8 @@ async fn inner_legacy_profile_login(
 ) -> Result<(), anyhow::Error> {
     let profile_set = &state.lock().await.aws_profiles;
     let prof = profile_set
-        .get_profile(profile_name)
+        .profiles
+        .get(profile_name)
         .ok_or(anyhow!("Profile not found!"))?;
     let sso_region = prof
         .get("sso_region")
@@ -273,7 +279,7 @@ async fn inner_legacy_profile_login(
 #[tauri::command]
 pub(crate) async fn refresh_profiles(state: State<'_, Mutex<ButlerState>>) -> Result<(), String> {
     let mut state = state.lock().await;
-    state.aws_profiles = fetch_profiles().await.map_err(|e| e.to_string())?;
+    state.aws_profiles = fetch_profiles_new().map_err(|e| e.to_string())?;
     // println!("{:#?}", state.aws_profiles);
     Ok(())
 }
@@ -337,10 +343,15 @@ pub(crate) async fn fetch_butler_config(
 ) -> Result<ButlerSsoConfig, String> {
     // println!("Fetching butler config...");
     let state = &state.lock().await.aws_profiles;
-    let sessions = state.sso_sessions();
+    let sessions = &state
+        .sessions
+        .iter()
+        .map(|s| s.1.name())
+        .collect::<Vec<_>>();
     let profiles = state
-        .profiles()
-        .flat_map(|pn| state.get_profile(pn))
+        .profiles
+        .iter()
+        .flat_map(|pn| state.profiles.get(pn.1.name()))
         .collect::<Vec<_>>();
 
     let session_profiles = profiles
@@ -360,6 +371,7 @@ pub(crate) async fn fetch_butler_config(
     // println!("fetched sessions, session profiles and legacy profiles... Now making config");
     let config = ButlerSsoConfig {
         sessions: sessions
+            .iter()
             .map(|sn| {
                 let cached_token = get_token_from_cache(sn)?;
                 let sso_exp = cached_token.map(|tok| tok.expiration);

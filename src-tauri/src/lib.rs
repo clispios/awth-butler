@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::anyhow;
+use aws::config::AwsConfigSections;
 use futures::{
     SinkExt, StreamExt,
     channel::mpsc::{Receiver, channel},
@@ -8,10 +9,10 @@ use futures::{
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::{AppHandle, Emitter, Manager, async_runtime::spawn};
 use tokio::sync::Mutex;
-use utils::fetch_profiles;
+use utils::fetch_profiles_new;
 
+mod aws;
 mod cache;
-mod credentials;
 mod error;
 mod handlers;
 mod utils;
@@ -59,7 +60,7 @@ async fn async_watch<P: AsRef<Path>>(path: P, app: AppHandle) -> notify::Result<
     Ok(())
 }
 pub(crate) struct ButlerState {
-    pub(crate) aws_profiles: aws_runtime::env_config::section::EnvConfigSections,
+    pub(crate) aws_profiles: AwsConfigSections,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -86,7 +87,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn setup(app: AppHandle) -> Result<(), anyhow::Error> {
     let state = ButlerState {
-        aws_profiles: fetch_profiles().await?,
+        aws_profiles: fetch_profiles_new()?,
     };
     app.manage(Mutex::new(state));
     let splash_win = app

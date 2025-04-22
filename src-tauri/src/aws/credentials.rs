@@ -4,9 +4,6 @@ use aws_sdk_sso::operation::get_role_credentials::GetRoleCredentialsOutput;
 use crate::utils::parse_aws_date_robust;
 
 pub(crate) struct ButlerRoleCreds {
-    // pub(crate) access_key_id: String,
-    // pub(crate) secret_access_key: String,
-    // pub(crate) session_token: String,
     pub(crate) expiration: chrono::DateTime<chrono::Utc>,
 }
 
@@ -30,18 +27,6 @@ pub(crate) fn get_credentials_for_profile(
     if let Some(section) = section {
         // Extract the credentials
         let brc = ButlerRoleCreds {
-            // access_key_id: section
-            //     .get("aws_access_key_id")
-            //     .ok_or(anyhow!("Missing access key ID!"))?
-            //     .to_string(),
-            // secret_access_key: section
-            //     .get("aws_secret_access_key")
-            //     .ok_or(anyhow!("Missing secret access key!"))?
-            //     .to_string(),
-            // session_token: section
-            //     .get("aws_session_token")
-            //     .ok_or(anyhow!("Missing session token!"))?
-            //     .to_string(),
             expiration: parse_aws_date_robust(
                 section
                     .get("aws_session_expiration")
