@@ -1,21 +1,51 @@
 use std::path::Path;
 
-use anyhow::anyhow;
 use aws::config::AwsConfigSections;
 use futures::{
     SinkExt, StreamExt,
     channel::mpsc::{Receiver, channel},
 };
+use global::trace_err_ret;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::{AppHandle, Emitter, Manager, async_runtime::spawn};
 use tokio::sync::Mutex;
+use tracing::{Level, info};
 use utils::fetch_profiles_new;
 
 mod aws;
 mod cache;
 mod error;
+mod global;
 mod handlers;
 mod utils;
+
+fn setup_logging() {
+    #[cfg(all(desktop, not(debug_assertions)))]
+    let writer = {
+        use crate::global::APP_CONFIG_DIR;
+        use std::{fs::File, sync::Mutex};
+        let log_file =
+            File::create(APP_CONFIG_DIR.join("butler.log")).expect("Failed to create the log file");
+        Mutex::new(log_file)
+    };
+
+    #[cfg(any(debug_assertions, mobile))]
+    let writer = std::io::stderr;
+
+    let builder = tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .with_file(true)
+        .with_line_number(true)
+        .with_env_filter("awth_butler_lib")
+        .with_target(false)
+        .with_writer(writer);
+
+    if cfg!(debug_assertions) {
+        builder.init();
+    } else {
+        builder.json().init();
+    }
+}
 
 fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (mut tx, rx) = channel(1);
@@ -48,12 +78,12 @@ async fn async_watch<P: AsRef<Path>>(path: P, app: AppHandle) -> notify::Result<
                 | notify::EventKind::Modify(_)
                 | notify::EventKind::Remove(_) => {
                     if let Err(e) = app.emit_to("main", "configs-change", "change") {
-                        println!("emit error: {:?}", e);
+                        tracing::error!("emit error: {:?}", e);
                     }
                 }
                 _ => {}
             },
-            Err(e) => println!("watch error: {:?}", e),
+            Err(e) => tracing::error!("watch error: {:?}", e),
         }
     }
 
@@ -65,16 +95,18 @@ pub(crate) struct ButlerState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() -> Result<(), anyhow::Error> {
-    let home_dir = dirs::home_dir().ok_or(anyhow!("No home directory detected!"))?;
-    let config_dir = home_dir.join(".aws");
+    setup_logging();
+    info!("Logging initialized");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            let home_dir = dirs::home_dir().ok_or(trace_err_ret("No home directory detected!"))?;
+            let config_dir = home_dir.join(".aws");
             spawn(setup(app.handle().clone()));
             spawn(async_watch(config_dir, app.handle().clone()));
             Ok(())
         })
-        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             handlers::authenticate_aws,
             handlers::refresh_profiles,
@@ -92,10 +124,10 @@ async fn setup(app: AppHandle) -> Result<(), anyhow::Error> {
     app.manage(Mutex::new(state));
     let splash_win = app
         .get_webview_window("splashscreen")
-        .ok_or(anyhow!("No splashscreen!"))?;
+        .ok_or(trace_err_ret("No splashscreen!"))?;
     let main_win = app
         .get_webview_window("main")
-        .ok_or(anyhow!("No main window!"))?;
+        .ok_or(trace_err_ret("No main window!"))?;
     splash_win.close()?;
     main_win.show()?;
     Ok(())

@@ -21,10 +21,11 @@ pub(crate) fn parse_aws_date_robust(date_str: &str) -> Result<DateTime<Utc>, any
             return Ok(dt.with_timezone(&Utc));
         }
     }
-
-    Err(anyhow!(
+    let err = anyhow!(
         "Failed to parse date: '{}'. Tried formats: {:?}",
         date_str,
         formats.iter().map(|f| f.to_string()).collect::<Vec<_>>()
-    ))
+    );
+    tracing::error!("{}", err);
+    Err(err)
 }

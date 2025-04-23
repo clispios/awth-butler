@@ -15,7 +15,7 @@ name = "awth_butler_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.1.0", features = [] }
+tauri-build = { version = "2.2.0", features = [] }
 
 [dependencies]
 anyhow = "1.0.97"
@@ -27,10 +27,10 @@ dirs = "6.0.0"
 futures = "0.3.31"
 notify = "8.0.0"
 rust-ini = "0.21.1"
-tauri = { version = "2.4.0", features = [] }
-tauri-plugin-shell = "2.2.0"
-tauri-plugin-opener = "2.2.0"
+tauri = { version = "2.5.1", features = [] }
 thiserror = "2.0.12"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["tracing-log", "fmt", "env-filter", "json"] }
 tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"

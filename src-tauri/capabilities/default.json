@@ -8,8 +8,6 @@
   "permissions": [
     "core:default",
     "core:path:default",
-    "opener:default",
-    "shell:allow-open",
     "dialog:default",
     "core:event:default",
     "core:window:default",
