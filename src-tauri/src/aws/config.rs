@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::anyhow;
+use crate::trace_err_ret;
 
 pub(crate) struct Profile {
     pub(crate) name: String,
@@ -46,13 +46,14 @@ impl AwsConfigSections {
         let mut profiles = HashMap::new();
         let mut sessions = HashMap::new();
 
-        let home_dir = dirs::home_dir().ok_or(anyhow!("No home directory detected!"))?;
+        let home_dir =
+            dirs::home_dir().ok_or_else(|| trace_err_ret("No home directory detected!"))?;
         let config_path = home_dir.join(".aws").join("config");
         if !config_path.exists() {
-            return Err(anyhow!(
+            return Err(trace_err_ret(&format!(
                 "No config file found at {:?}. Please configure accordingly!",
                 config_path
-            ));
+            )));
         } else {
             let config_ini = ini::Ini::load_from_file(&config_path)?;
             for (section_name, section) in config_ini.iter() {

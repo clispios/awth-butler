@@ -18,10 +18,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.2.0", features = [] }
 
 [dependencies]
-anyhow = "1.0.97"
-aws-config = { version = "1.6.0", features = ["behavior-version-latest"] }
-aws-sdk-sso = "1.62.0"
-aws-sdk-ssooidc = "1.63.0"
+anyhow = "1.0.98"
+aws-config = { version = "1.6.1", features = ["behavior-version-latest"] }
+aws-sdk-sso = "1.64.0"
+aws-sdk-ssooidc = "1.65.0"
 chrono = { version = "0.4.40", features = ["serde"] }
 dirs = "6.0.0"
 futures = "0.3.31"
@@ -29,9 +29,9 @@ notify = "8.0.0"
 rust-ini = "0.21.1"
 tauri = { version = "2.5.1", features = [] }
 thiserror = "2.0.12"
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["tracing-log", "fmt", "env-filter", "json"] }
-tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["tracing-log", "fmt", "env-filter", "json"] }
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread", "sync", "time"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 sha1 = "0.10.6"

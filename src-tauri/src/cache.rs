@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use aws_sdk_ssooidc::operation::register_client::RegisterClientOutput;
 use serde_json::json;
 use sha1::{Digest, Sha1};
@@ -21,7 +20,7 @@ pub(crate) fn store_token_in_cache(
 
     // Determine cache directory
     let cache_dir = dirs::home_dir()
-        .ok_or(trace_err_ret("home directory not found..."))?
+        .ok_or_else(|| trace_err_ret("home directory not found..."))?
         .join(".aws")
         .join("sso")
         .join("cache");
@@ -41,7 +40,7 @@ pub(crate) fn store_token_in_cache(
         "clientSecret": reg_cli.client_secret,
         "registrationExpiresAt": format!("{}",
             chrono::DateTime::<chrono::Utc>::from_timestamp(reg_cli.client_secret_expires_at(), 0)
-                .ok_or(trace_err_ret("Invalid timestamp!"))?
+                .ok_or_else(|| trace_err_ret("Invalid timestamp!"))?
                 .format("%Y-%m-%dT%H:%M:%SZ")),
         "expiresAt": format!("{}",
             chrono::DateTime::<chrono::Utc>::from(token.expiration)
@@ -67,7 +66,7 @@ pub(crate) fn store_token_in_cache(
 pub(crate) fn get_token_from_cache(session_name: &str) -> Result<Option<SsoToken>, anyhow::Error> {
     // Get the cache directory
     let cache_dir = dirs::home_dir()
-        .ok_or(trace_err_ret("home directory not found..."))?
+        .ok_or_else(|| trace_err_ret("home directory not found..."))?
         .join(".aws")
         .join("sso")
         .join("cache");
@@ -98,7 +97,7 @@ pub(crate) fn get_token_from_cache(session_name: &str) -> Result<Option<SsoToken
                     let access_token = json
                         .get("accessToken")
                         .and_then(|v| v.as_str())
-                        .ok_or(trace_err_ret("Invalid cache entry!"))?
+                        .ok_or_else(|| trace_err_ret("Invalid cache entry!"))?
                         .to_string();
 
                     let refresh_token = json
@@ -109,7 +108,7 @@ pub(crate) fn get_token_from_cache(session_name: &str) -> Result<Option<SsoToken
                     let expires_at = json
                         .get("expiresAt")
                         .and_then(|v| v.as_str())
-                        .ok_or(trace_err_ret("Invalid cache entry!"))?;
+                        .ok_or_else(|| trace_err_ret("Invalid cache entry!"))?;
 
                     // Parse expiration date
                     let expiration = chrono::DateTime::parse_from_rfc3339(expires_at)?

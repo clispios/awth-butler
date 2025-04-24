@@ -3,7 +3,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use anyhow::anyhow;
 use aws_config::Region;
 use aws_sdk_sso::operation::get_role_credentials::GetRoleCredentialsOutput;
 use aws_sdk_ssooidc::operation::{
@@ -63,12 +62,12 @@ async fn run_client_authorization(
         .client_id(
             reg_cli
                 .client_id()
-                .ok_or(trace_err_ret("Client ID not found!"))?,
+                .ok_or_else(|| trace_err_ret("Client ID not found!"))?,
         )
         .client_secret(
             reg_cli
                 .client_secret()
-                .ok_or(trace_err_ret("Client Secret not found!"))?,
+                .ok_or_else(|| trace_err_ret("Client Secret not found!"))?,
         )
         .start_url(start_url)
         .send()
@@ -85,9 +84,9 @@ async fn execute_login_flow(
         &app_handle,
         "aws_authenticate",
         WebviewUrl::External(tauri::Url::from_str(
-            auth_out.verification_uri_complete().ok_or(trace_err_ret(
-                "No verification uri after client registration!",
-            ))?,
+            auth_out
+                .verification_uri_complete()
+                .ok_or_else(|| trace_err_ret("No verification uri after client registration!"))?,
         )?),
     )
     .title("AWS Authenticate")
@@ -122,18 +121,18 @@ async fn execute_login_flow(
             .client_id(
                 reg_cli
                     .client_id()
-                    .ok_or(trace_err_ret("Client ID not found!"))?,
+                    .ok_or_else(|| trace_err_ret("Client ID not found!"))?,
             )
             .client_secret(
                 reg_cli
                     .client_secret()
-                    .ok_or(trace_err_ret("Client Secret not found!"))?,
+                    .ok_or_else(|| trace_err_ret("Client Secret not found!"))?,
             )
             .grant_type("urn:ietf:params:oauth:grant-type:device_code")
             .device_code(
                 auth_out
                     .device_code()
-                    .ok_or(trace_err_ret("Device code not found!"))?,
+                    .ok_or_else(|| trace_err_ret("Device code not found!"))?,
             )
             .send()
             .await
@@ -141,7 +140,7 @@ async fn execute_login_flow(
             token = Some(SsoToken {
                 access_token: output
                     .access_token()
-                    .ok_or(trace_err_ret("Access token missing from completed auth!"))?
+                    .ok_or_else(|| trace_err_ret("Access token missing from completed auth!"))?
                     .to_string(),
                 refresh_token: output.refresh_token().map(|s| s.to_string()),
                 expiration: SystemTime::now() + Duration::from_secs(output.expires_in() as u64),
@@ -155,7 +154,7 @@ async fn execute_login_flow(
         auth_window.close()?
     }
 
-    token.ok_or(trace_err_ret("Unable to complete SSO login flow!"))
+    token.ok_or_else(|| trace_err_ret("Unable to complete SSO login flow!"))
 }
 
 async fn inner_sso_session_login(
@@ -169,10 +168,10 @@ async fn inner_sso_session_login(
     let session = profile_set
         .sessions
         .get(session_name)
-        .ok_or(trace_err_ret("Session not found!"))?;
+        .ok_or_else(|| trace_err_ret("Session not found!"))?;
     let sso_region = session
         .get("sso_region")
-        .ok_or(trace_err_ret("No region found for session!"))?;
+        .ok_or_else(|| trace_err_ret("No region found for session!"))?;
     let region = Region::new(sso_region.to_string());
 
     // generate AWS config and clients
@@ -183,7 +182,7 @@ async fn inner_sso_session_login(
     // run the client authorization flow
     let sso_start_url = session
         .get("sso_start_url")
-        .ok_or(trace_err_ret("No start URL found for session!"))?;
+        .ok_or_else(|| trace_err_ret("No start URL found for session!"))?;
     let response = run_client_authorization(&sso_oidc_client, &reg_cli, sso_start_url).await?;
     let token = execute_login_flow(app_handle, &response, &sso_oidc_client, &reg_cli).await?;
 
@@ -213,11 +212,11 @@ async fn inner_sso_session_login(
                 .get_role_credentials()
                 .account_id(
                     p.get("sso_account_id")
-                        .ok_or(trace_err_ret("No account ID found for profile!"))?,
+                        .ok_or_else(|| trace_err_ret("No account ID found for profile!"))?,
                 )
                 .role_name(
                     p.get("sso_role_name")
-                        .ok_or(trace_err_ret("No role name found for profile!"))?,
+                        .ok_or_else(|| trace_err_ret("No role name found for profile!"))?,
                 )
                 .access_token(&token.access_token)
                 .send()
@@ -251,22 +250,22 @@ async fn inner_legacy_profile_login(
     let prof = profile_set
         .profiles
         .get(profile_name)
-        .ok_or(trace_err_ret("Profile not found!"))?;
+        .ok_or_else(|| trace_err_ret("Profile not found!"))?;
     let sso_region = prof
         .get("sso_region")
-        .ok_or(trace_err_ret("No sso_region found for profile!"))?;
+        .ok_or_else(|| trace_err_ret("No sso_region found for profile!"))?;
     let region = Region::new(sso_region.to_string());
     let config = generate_aws_config(region).await;
     let sso_oidc_client = aws_sdk_ssooidc::Client::new(&config);
     let reg_cli = create_registered_client(&sso_oidc_client).await?;
     let sso_start_url = prof
         .get("sso_start_url")
-        .ok_or(trace_err_ret("No sso_start_url found for profile!"))?;
+        .ok_or_else(|| trace_err_ret("No sso_start_url found for profile!"))?;
     let response = run_client_authorization(
         &sso_oidc_client,
         &reg_cli,
         prof.get("sso_start_url")
-            .ok_or(trace_err_ret("No sso_start_url found for profile!"))?,
+            .ok_or_else(|| trace_err_ret("No sso_start_url found for profile!"))?,
     )
     .await?;
 
@@ -404,7 +403,7 @@ pub(crate) async fn fetch_butler_config(
                 let prof_exp = cached_creds.map(|creds| creds.expiration);
                 let sess_name = prof
                     .get("sso_session")
-                    .ok_or(trace_err_ret("No session name found!"))?;
+                    .ok_or_else(|| trace_err_ret("No session name found!"))?;
                 let prof_fresh = prof_exp
                     .map(|exp| exp > chrono::Utc::now())
                     .unwrap_or(false);

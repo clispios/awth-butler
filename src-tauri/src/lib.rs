@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::PathBuf;
 
 use aws::config::AwsConfigSections;
 use futures::{
@@ -64,7 +64,7 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Resul
     Ok((watcher, rx))
 }
 
-async fn async_watch<P: AsRef<Path>>(path: P, app: AppHandle) -> notify::Result<()> {
+async fn async_watch(path: PathBuf, app: AppHandle) -> notify::Result<()> {
     let (mut watcher, mut rx) = async_watcher()?;
 
     // Add a path to be watched. All files and directories at that path and
@@ -89,6 +89,7 @@ async fn async_watch<P: AsRef<Path>>(path: P, app: AppHandle) -> notify::Result<
 
     Ok(())
 }
+
 pub(crate) struct ButlerState {
     pub(crate) aws_profiles: AwsConfigSections,
 }
@@ -98,37 +99,32 @@ pub async fn run() -> Result<(), anyhow::Error> {
     setup_logging();
     info!("Logging initialized");
 
+    let home_dir = dirs::home_dir().ok_or_else(|| trace_err_ret("home directory not found..."))?;
+    let path = home_dir.join(".aws");
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let home_dir = dirs::home_dir().ok_or(trace_err_ret("No home directory detected!"))?;
-            let config_dir = home_dir.join(".aws");
             spawn(setup(app.handle().clone()));
-            spawn(async_watch(config_dir, app.handle().clone()));
+            spawn(async_watch(path, app.handle().clone()));
             Ok(())
         })
+        .manage(Mutex::new(ButlerState {
+            aws_profiles: fetch_profiles_new()?,
+        }))
         .invoke_handler(tauri::generate_handler![
             handlers::authenticate_aws,
             handlers::refresh_profiles,
             handlers::fetch_butler_config,
         ])
-        // allow rust-analyzer error E0308
+        // NOTE: This error is fine
         .run(tauri::generate_context!())
         .map_err(Into::into)
 }
 
 async fn setup(app: AppHandle) -> Result<(), anyhow::Error> {
-    let state = ButlerState {
-        aws_profiles: fetch_profiles_new()?,
-    };
-    app.manage(Mutex::new(state));
-    let splash_win = app
-        .get_webview_window("splashscreen")
-        .ok_or(trace_err_ret("No splashscreen!"))?;
     let main_win = app
         .get_webview_window("main")
-        .ok_or(trace_err_ret("No main window!"))?;
-    splash_win.close()?;
-    main_win.show()?;
+        .ok_or_else(|| trace_err_ret("main window not found"))?;
+    main_win.center()?;
     Ok(())
 }

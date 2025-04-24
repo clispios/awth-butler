@@ -18,16 +18,7 @@
         "minWidth": 810,
         "height": 870,
         "minHeight": 870,
-        "visible": false
-      },
-      {
-        "title": "",
-        "label": "splashscreen",
-        "url": "/splashscreen",
-        "width": 810,
-        "minWidth": 810,
-        "height": 870,
-        "minHeight": 870
+        "visible": true
       }
     ],
     "security": {

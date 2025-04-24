@@ -1,7 +1,6 @@
-use anyhow::anyhow;
 use aws_sdk_sso::operation::get_role_credentials::GetRoleCredentialsOutput;
 
-use crate::utils::parse_aws_date_robust;
+use crate::{trace_err_ret, utils::parse_aws_date_robust};
 
 pub(crate) struct ButlerRoleCreds {
     pub(crate) expiration: chrono::DateTime<chrono::Utc>,
@@ -11,7 +10,7 @@ pub(crate) fn get_credentials_for_profile(
     profile_name: &str,
 ) -> Result<Option<ButlerRoleCreds>, anyhow::Error> {
     // Get the credentials file path
-    let home_dir = dirs::home_dir().ok_or(anyhow!("No home directory detected!"))?;
+    let home_dir = dirs::home_dir().ok_or_else(|| trace_err_ret("No home directory detected!"))?;
     let credentials_path = home_dir.join(".aws").join("credentials");
 
     // Ensure file exists, if not return None
@@ -30,7 +29,7 @@ pub(crate) fn get_credentials_for_profile(
             expiration: parse_aws_date_robust(
                 section
                     .get("aws_session_expiration")
-                    .ok_or(anyhow!("Missing expiration timestamp!"))?,
+                    .ok_or_else(|| trace_err_ret("Missing expiration timestamp!"))?,
             )?,
         };
         Ok(Some(brc))
@@ -44,7 +43,7 @@ pub(crate) fn store_credentials_for_profile(
     creds: &GetRoleCredentialsOutput,
 ) -> Result<(), anyhow::Error> {
     // Get the credentials file path
-    let home_dir = dirs::home_dir().ok_or(anyhow!("No home directory detected!"))?;
+    let home_dir = dirs::home_dir().ok_or_else(|| trace_err_ret("No home directory detected!"))?;
     let credentials_path = home_dir.join(".aws").join("credentials");
 
     // Ensure the directory exists
@@ -63,30 +62,30 @@ pub(crate) fn store_credentials_for_profile(
     let role_creds = creds
         .role_credentials
         .as_ref()
-        .ok_or(anyhow!("Missing role credentials after login!"))?;
+        .ok_or_else(|| trace_err_ret("Missing role credentials after login!"))?;
 
     // Format expiration as ISO 8601
     let expiration = chrono::DateTime::<chrono::Utc>::from_timestamp_millis(
         role_creds.expiration, // Convert milliseconds to seconds
     )
-    .ok_or(anyhow!("Invalid expiration timestamp!"))?
+    .ok_or_else(|| trace_err_ret("Invalid expiration timestamp!"))?
     .to_rfc3339();
 
     let session_token = role_creds
         .session_token()
-        .ok_or(anyhow!("Missing session token!"))?;
+        .ok_or_else(|| trace_err_ret("Missing session token!"))?;
     ini.with_section(Some(profile_name.to_string()))
         .set(
             "aws_access_key_id",
             role_creds
                 .access_key_id()
-                .ok_or(anyhow!("Missing access key ID!"))?,
+                .ok_or_else(|| trace_err_ret("Missing access key ID!"))?,
         )
         .set(
             "aws_secret_access_key",
             role_creds
                 .secret_access_key()
-                .ok_or(anyhow!("Missing secret access key!"))?,
+                .ok_or_else(|| trace_err_ret("Missing secret access key!"))?,
         )
         .set("aws_session_token", session_token)
         .set("aws_security_token", session_token)
